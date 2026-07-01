@@ -1,7 +1,7 @@
-# Morus Financial Display Skill
 ---
 name: morus-financials
 description: When given company financial data (uploaded document, image, or pasted text), extract the most recent balance sheet and income statement values and render them as a styled HTML artifact consistent with Morus brand standards.
+---
 
 ## Input
 
@@ -70,8 +70,14 @@ For simple and full finanncial models use the following templates (in `assets/` 
 
 ## Output Files
 
+Replace {company name} with the company name being analyzed
 
+```
 results/
+├── simple-fcff-{company name}.xlsx      # Simple financial model template populated with company values
+├── fin-model-{comapany name}.xlsx       # Full financial model template populated with comapny values
+└── summary-{comapny name}.pdf           # Summary of key financial from models
+```
 
 
 ## Notes
