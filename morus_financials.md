@@ -1,7 +1,11 @@
 # Morus Financial Display Skill
+---
+name: morus-financials
+description: When given company financial data (uploaded document, image, or pasted text), extract the most recent balance sheet and income statement values and render them as a styled HTML artifact consistent with Morus brand standards.
 
-## Purpose
-When given company financial data (uploaded document, image, or pasted text), extract the most recent balance sheet and income statement values and render them as a styled HTML artifact consistent with Morus brand standards.
+## Input
+
+Pdf files, images or pasted text: With balance sheet and income statement and other key financial information.
 
 ---
 
