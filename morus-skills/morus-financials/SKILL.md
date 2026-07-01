@@ -63,8 +63,8 @@ When a user uploads or pastes company financials, follow these steps:
 
 **For specific excel ouputs format**: 
 For simple and full finanncial models use the following templates (in `assets/` folder):
-- simple-fcff-model.xlsx - simple free cashflow to the firm  model with formatting and calculation structure
-- fin-model.xlsx - three statement financial model with formatting and calculation structure
+- simple-fcff-temp.xlsx - simple free cashflow to the firm  model with formatting and calculation structure
+- fin-temp.xlsx - three statement financial model with formatting and calculation structure
 
 ---
 
