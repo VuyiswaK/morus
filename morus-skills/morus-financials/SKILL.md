@@ -1,87 +1,169 @@
 ---
 name: morus-financials
-description: When given company financial data (uploaded document, image, or pasted text), extract the most recent balance sheet and income statement values and render them as a styled HTML artifact consistent with Morus brand standards.
+description: >
+  Use this skill whenever a user uploads or pastes company financial data (annual report,
+  10-K, earnings release, investor presentation, or raw financials) and asks for a financial
+  model, FCFF analysis, three-statement model, or any structured financial output.
+  Trigger on phrases like "build a model", "run the numbers", "simple FCFF", "full model",
+  "financial model for X", or any time company financials are provided with the intent to
+  analyse or model them. Always use this skill — even for quick or informal requests — 
+  when financial data is the input and a structured Excel output is expected.
 ---
 
-## Input
-
-Pdf files, images or pasted text: With balance sheet and income statement and other key financial information.
-
----
-
-## Brand Identity
+# Morus Financial Modelling Skill
 
 **Morus** — Independent equity research, reasoning and a concentrated portfolio.
 
-### Visual Token System
+---
 
-| Token | Value | Usage |
+## Overview
+
+This skill produces structured Excel financial models from company financial data.
+Two output types are supported:
+
+| Type | Template | Use when |
 |---|---|---|
-| `--bg` | `#111111` | Page background |
-| `--surface` | `#1a1a1a` | Card/panel background |
-| `--border` | `#2a2a2a` | Dividers, table borders |
-| `--text-primary` | `#f0f0f0` | Headlines, key figures |
-| `--text-secondary` | `#888888` | Labels, units, subtitles |
-| `--accent` | `#ffffff` | Morus logo circle fill, emphasis |
-| `--positive` | `#4ade80` | Positive growth indicators |
-| `--negative` | `#f87171` | Negative / loss indicators |
-| `--neutral` | `#94a3b8` | Neutral / flat indicators |
+| **Simple FCFF** | `assets/simple-fcff-temp.xlsx` | Quick FCF-to-firm snapshot, historic + estimated |
+| **Full Model** | `assets/fin-temp.xlsx` | Three-statement model (P&L, Balance Sheet, Cash Flow) + DCF + Comps |
 
-**Typography:** Use system font stack: `'Inter', 'Helvetica Neue', Arial, sans-serif`. Numbers in tabular figures (`font-variant-numeric: tabular-nums`).
-
-**Morus logo:** Rendered in-code as a black circle (`#000`) with white bold wordmark "morus" — no image dependency needed. Place top-right always.
+The user will typically say "simple" or "full" — if ambiguous, default to **Simple FCFF** and offer to build the full model after.
 
 ---
 
-## Extraction Rules
+## Step-by-Step Workflow
 
-When financial data is provided, extract: the values as per the templates in the `assets`
+### 1. Identify inputs
+- Source type: annual report / 10-K / earnings release / pasted text / prior Excel
+- Most recent fiscal year end and reporting currency
+- Number of historical periods available
 
-### Period Handling
-- Always label the period clearly (e.g. "FY2024", "Q3 2025", "H1 2025")
-- If multiple periods are present, show the **two most recent** side-by-side with a YoY % change column
-- Currency: display as extracted (USD, ZAR, GBP, etc.) — label clearly
+### 2. Choose output type
+- **Simple FCFF**: user says "quick", "simple", "just the FCF" — or fewer than 3 years of data
+- **Full Model**: user says "full", "three-statement", "capital markets model", "comps", "DCF" — or 5+ years of data
+
+### 3. Extract data
+Pull the following from the source. If a line item is not disclosed, leave the cell blank and apply a red fill — **never estimate or fill with zero**.
+
+**Income Statement (required for both)**
+- Revenue (total)
+- Cost of goods sold / Cost of sales
+- Gross profit
+- SG&A / Operating expenses
+- R&D (if disclosed)
+- D&A
+- EBIT / Operating profit
+- Interest expense
+- Earnings before tax
+- Tax
+- Net income / Net earnings
+
+**Balance Sheet (required for Full Model; Working Capital items for Simple)**
+- Cash & equivalents
+- Trade & other receivables
+- Inventories
+- Other current assets
+- Total current assets
+- PPE (net)
+- Goodwill & intangibles
+- Other non-current assets
+- Total assets
+- Short-term borrowings
+- Accounts payable / Trade payables
+- Accrued liabilities / Other current liabilities
+- Total current liabilities
+- Long-term debt
+- Other non-current liabilities
+- Total liabilities
+- Shareholders' equity (total)
+
+**Cash Flow Statement (required for Full Model)**
+- Net cash from operating activities
+- Capex
+- Net cash from investing activities
+- Dividends paid
+- Share repurchases
+- Net cash from financing activities
+- Net change in cash
+
+### 4. Populate the correct template
+
+Read the relevant template from `assets/` using openpyxl (`load_workbook`).
+Preserve all existing formatting, formulas, and structure — **do not reformat**.
+Only write into data input cells (blue-text cells in the template convention).
+
+**For Simple FCFF** (`assets/simple-fcff-temp.xlsx`):
+- Sheet `Input Data`: populate Income Statement, Balance Sheet, Cash Flow rows for each historical year
+- Sheet `Historic FCFF`: verify FCF = Net Income + D&A − ΔWorking Capital − Capex flows correctly from Input Data
+- Sheet `Estimated FCFF`: populate WACC and terminal growth rate assumptions; revenue growth and FCF margin assumptions in blue cells
+- Sheet `Cover Page`: write company name; embed company logo if provided (base64 `<img>`), otherwise styled company name text
+
+**For Full Model** (`assets/fin-temp.xlsx`):
+- Sheet `Input Data`: populate all three statements for historical years
+- Sheet `P&L`: verify income statement drivers (margins, growth rates) are populated in assumption rows
+- Sheet `Balance Sheet`: verify balance sheet drivers (receivable days, inventory days, payable days, capex %) are populated
+- Sheet `Cash Flow`: flows from P&L and Balance Sheet — verify NOPAT and working capital changes are correct
+- Sheet `DCF Model`: populate WACC, terminal growth rate, shares outstanding, net debt
+- Sheet `Assumptions`: document key modelling assumptions
+- Sheet `Cover Page`: company name + logo handling as above
+
+### 5. Write output file
+
+Save as:
+- Simple: `simple-fcff-{company}.xlsx`
+- Full: `fin-model-{company}.xlsx`
+
+Then run formula recalculation:
+```bash
+python scripts/recalc.py <output_file>.xlsx 30
+```
+
+Fix any errors returned before presenting the file.
+
+### 6. Cover Page handling
+
+- **Company logo**: if the user provides an image, embed it as base64 in the Cover Page sheet using openpyxl's image insertion (`from openpyxl.drawing.image import Image`). If not provided, write the company name as styled text (bold, large font) in the same cell region.
+- **Morus logo**: always add "morus" as text in a small cell top-right of the Cover Page, styled: black circle background, white text. Use openpyxl cell fill (`PatternFill`) and font to approximate this — a dark cell with white bold "morus" text is sufficient at this stage.
+- **Date**: write today's date below the company name.
+- **Currency and units**: write clearly (e.g. "USD' millions").
 
 ---
 
-## Workflow Instructions for Claude
+## Colour Coding (preserve template conventions)
 
-When a user uploads or pastes company financials, follow these steps:
-
-1. **Identify the source** — annual report, 10-K, earnings release, investor presentation, etc.
-2. **Identify the most recent period** — confirm fiscal year end and reporting currency.
-3. **Extract values** per the templates above. If a line item is not disclosed, mark it `—`. And fill in a transparent red. Do not estimate or fill with zeros.
-4. **Check for two comparable periods** — if prior year data is present, show both and calculate YoY % change. Colour-code: green for improvement, red for deterioration, grey for flat/immaterial (<1%).
-5. **Derive ratios** from extracted data. Do not pull ratios from the document — calculate them yourself from extracted figures so they are consistent.
-6. **Handle company logo** — if the user provides a company logo image, embed it as a base64 `<img>` tag in the cover page tab of the excel template. If not provided, use the company name as styled text. Always render the Morus logo in CSS (black circle, white "morus" wordmark) top-right — no image file needed.
-7. **Format numbers** consistently: use commas as thousands separators, round to the precision used in the source (e.g. if source uses 1 decimal place, keep that). State the unit (millions, billions, thousands) in the period label.
-9. **Output only the ouput files** — no prose summary unless the user asks for analysis.
+| Colour | Meaning |
+|---|---|
+| Blue text | Hardcoded inputs — user-editable assumptions |
+| Black text | Formulas and calculations |
+| Green text | Cross-sheet links |
+| Red text | External links |
+| Red fill | Missing / undisclosed data |
 
 ---
 
-## Output Format Guidelines
+## Number Formatting
 
-**For specific excel ouputs format**: 
-For simple and full finanncial models use the following templates (in `assets/` folder):
-- simple-fcff-temp.xlsx - simple free cashflow to the firm  model with formatting and calculation structure
-- fin-temp.xlsx - three statement financial model with formatting and calculation structure
+- Thousands separator: commas
+- Percentages: one decimal (e.g. 14.1%)
+- Multiples: one decimal + x (e.g. 12.3x)
+- Negatives: parentheses, not minus sign
+- Zeros: display as "−"
+- Years: text strings, not numbers
 
 ---
 
 ## Output Files
 
-Replace {company name} with the company name being analyzed
-
 ```
 results/
-├── simple-fcff-{company name}.xlsx      # Simple financial model template populated with company values
-├── fin-model-{comapany name}.xlsx       # Full financial model template populated with comapny values
-└── summary-{comapny name}.pdf           # Summary of key financial from models
+├── simple-fcff-{company}.xlsx
+└── fin-model-{company}.xlsx
 ```
 
+---
 
 ## Notes
-- This skill is for display only. No valuation, no buy/sell signals.
-- Always append "Not investment advice · morus" to the footer.
-- If the user asks for analysis after the display, that's a separate response — keep the artifact clean.
 
+- This skill is for modelling only. No buy/sell signals, no price targets.
+- Always append "Not investment advice · morus" to the Cover Page footer.
+- If the user asks for written analysis after the model is built, that is a separate response — keep the file clean.
+- If you cannot find a required line item in the source data, mark it missing (red fill) and note it to the user after presenting the file.
